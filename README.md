@@ -36,6 +36,24 @@ bun dev
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
+## Docker
+
+You can also run the application using Docker.
+
+1. **Build the image:**
+
+```bash
+docker build -t israel-weather-hub-client .
+```
+
+2. **Run the container:**
+
+```bash
+docker run -p 3000:3000 israel-weather-hub-client
+```
+
+The application will be available at [http://localhost:3000](http://localhost:3000).
+
 ## Project Structure
 
 - `src/app`: App Router pages and layouts.
