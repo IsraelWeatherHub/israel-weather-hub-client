@@ -9,6 +9,30 @@ interface SynopticMapProps {
   forecastHour?: number;
 }
 
+// Cache to store downloaded map images
+export const mapCache = new Map<string, string>();
+
+export const prefetchMap = async (
+  apiUrl: string,
+  mapType: string,
+  region: string,
+  forecastHour: number
+) => {
+  const cacheKey = `${mapType}-${region}-${forecastHour}`;
+  if (mapCache.has(cacheKey)) return;
+
+  const url = `${apiUrl}/api/v1/maps/${mapType}/${region}/latest/image?forecast_hour=${forecastHour}`;
+  try {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error("Failed to fetch");
+    const blob = await res.blob();
+    const objectUrl = URL.createObjectURL(blob);
+    mapCache.set(cacheKey, objectUrl);
+  } catch (err) {
+    console.error(`Failed to prefetch map for hour ${forecastHour}`, err);
+  }
+};
+
 export default function SynopticMap({ 
   apiUrl = "http://localhost:8000",
   mapType = "synoptic",
@@ -20,20 +44,45 @@ export default function SynopticMap({
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    // Construct the image URL with a timestamp to prevent caching
-    const url = `${apiUrl}/api/v1/maps/${mapType}/${region}/latest/image?forecast_hour=${forecastHour}&t=${Date.now()}`;
+    let isMounted = true;
+    const cacheKey = `${mapType}-${region}-${forecastHour}`;
+
+    // Check if image is already in cache
+    if (mapCache.has(cacheKey)) {
+      setImageUrl(mapCache.get(cacheKey)!);
+      setLoading(false);
+      setError(null);
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+
+    // Construct the image URL without timestamp to allow browser caching as well
+    const url = `${apiUrl}/api/v1/maps/${mapType}/${region}/latest/image?forecast_hour=${forecastHour}`;
     
-    // Preload the image to handle loading state
-    const img = new Image();
-    img.onload = () => {
-      setImageUrl(url);
-      setLoading(false);
+    fetch(url)
+      .then(async (res) => {
+        if (!res.ok) throw new Error("Failed to fetch image");
+        const blob = await res.blob();
+        if (isMounted) {
+          const objectUrl = URL.createObjectURL(blob);
+          mapCache.set(cacheKey, objectUrl);
+          setImageUrl(objectUrl);
+          setLoading(false);
+        }
+      })
+      .catch((err) => {
+        if (isMounted) {
+          console.error("Error loading map:", err);
+          setError("Failed to load synoptic map image");
+          setLoading(false);
+        }
+      });
+
+    return () => {
+      isMounted = false;
     };
-    img.onerror = () => {
-      setError("Failed to load synoptic map image");
-      setLoading(false);
-    };
-    img.src = url;
   }, [apiUrl, mapType, region, forecastHour]);
 
   if (error) {

@@ -1,14 +1,15 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Cloud, Wind, ThermometerSun, Play, Pause, ChevronLeft, ChevronRight, Map as MapIcon, Layers } from "lucide-react";
-import SynopticMap from "./SynopticMap";
+import { Cloud, Wind, ThermometerSun, Play, Pause, ChevronLeft, ChevronRight, Map as MapIcon, Layers, Download } from "lucide-react";
+import SynopticMap, { prefetchMap } from "./SynopticMap";
 
 export default function GFSDashboard() {
   const [mapType, setMapType] = useState("synoptic");
   const [region, setRegion] = useState("eastern_med");
   const [forecastHour, setForecastHour] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [cachingProgress, setCachingProgress] = useState<{current: number, total: number} | null>(null);
 
   // Animation loop
   useEffect(() => {
@@ -34,6 +35,23 @@ export default function GFSDashboard() {
   const stepBackward = () => {
     setForecastHour(prev => Math.max(prev - 6, 0));
     setIsPlaying(false);
+  };
+
+  const handleCacheRun = async () => {
+    const maxHour = 384; // Cache full run (16 days)
+    const step = 6;
+    const hours = [];
+    for (let h = 0; h <= maxHour; h += step) hours.push(h);
+    
+    setCachingProgress({ current: 0, total: hours.length });
+    setIsPlaying(false);
+
+    for (let i = 0; i < hours.length; i++) {
+      await prefetchMap("http://localhost:8000", mapType, region, hours[i]);
+      setCachingProgress({ current: i + 1, total: hours.length });
+    }
+    
+    setCachingProgress(null);
   };
 
   return (
@@ -108,6 +126,27 @@ export default function GFSDashboard() {
                </button>
                <button onClick={stepForward} className="p-1 text-slate-500 hover:text-slate-900 dark:hover:text-slate-300">
                  <ChevronRight className="h-6 w-6" />
+               </button>
+             </div>
+             <div className="h-6 w-px bg-slate-200 dark:bg-slate-700 mx-2"></div>
+             <div className="relative">
+               <button 
+                 onClick={handleCacheRun}
+                 disabled={!!cachingProgress}
+                 className="relative overflow-hidden flex items-center gap-2 px-3 py-1.5 text-xs font-medium rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 disabled:cursor-not-allowed transition-colors"
+               >
+                 {cachingProgress && (
+                   <div 
+                     className="absolute inset-0 bg-blue-200 dark:bg-blue-900/60 transition-all duration-300 ease-out"
+                     style={{ width: `${(cachingProgress.current / cachingProgress.total) * 100}%` }}
+                   />
+                 )}
+                 <div className="relative flex items-center gap-2 z-10">
+                   <Download className={`h-3.5 w-3.5 ${cachingProgress ? 'animate-bounce' : ''}`} />
+                   {cachingProgress 
+                     ? `Caching ${Math.round((cachingProgress.current / cachingProgress.total) * 100)}%` 
+                     : "Cache Full Run (16 Days)"}
+                 </div>
                </button>
              </div>
            </div>
