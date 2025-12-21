@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { CloudSun } from "lucide-react";
+import { ModeToggle } from "./ModeToggle";
 
 export function Header() {
   return (
@@ -16,6 +17,7 @@ export function Header() {
           <Link href="/alerts" className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors">Alerts</Link>
         </nav>
         <div className="flex items-center gap-4">
+          <ModeToggle />
           <button className="text-sm font-medium text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-50">
             Sign In
           </button>
