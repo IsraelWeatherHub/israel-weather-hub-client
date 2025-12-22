@@ -11,34 +11,6 @@ interface SynopticMapProps {
   forecastHour?: number;
 }
 
-// Cache to store signed URLs
-export const mapCache = new Map<string, string>();
-
-export const prefetchMap = async (
-  apiUrl: string,
-  model: string,
-  runDate: string,
-  runHour: string,
-  parameter: string,
-  forecastHour: number
-) => {
-  const fHourStr = forecastHour.toString().padStart(3, '0');
-  const cacheKey = `${model}-${runDate}-${runHour}-${parameter}-${fHourStr}`;
-  if (mapCache.has(cacheKey)) return;
-
-  const url = `${apiUrl}/maps/${model}/${runDate}/${runHour}/${parameter}/${fHourStr}`;
-  try {
-    const res = await fetch(url);
-    if (!res.ok) throw new Error("Failed to fetch");
-    const data = await res.json();
-    if (data.url) {
-        mapCache.set(cacheKey, data.url);
-    }
-  } catch (err) {
-    console.error(`Failed to prefetch map for hour ${forecastHour}`, err);
-  }
-};
-
 export default function SynopticMap({ 
   apiUrl = process.env.NEXT_PUBLIC_MAPS_API_URL || "http://localhost:3000/api/v1",
   model = "gfs",
@@ -54,15 +26,6 @@ export default function SynopticMap({
   useEffect(() => {
     let isMounted = true;
     const fHourStr = forecastHour.toString().padStart(3, '0');
-    const cacheKey = `${model}-${runDate}-${runHour}-${parameter}-${fHourStr}`;
-
-    // Check if image is already in cache
-    if (mapCache.has(cacheKey)) {
-      setImageUrl(mapCache.get(cacheKey)!);
-      setLoading(false);
-      setError(null);
-      return;
-    }
 
     setLoading(true);
     setError(null);
@@ -74,7 +37,6 @@ export default function SynopticMap({
         if (!res.ok) throw new Error("Failed to fetch image info");
         const data = await res.json();
         if (isMounted && data.url) {
-          mapCache.set(cacheKey, data.url);
           setImageUrl(data.url);
           setLoading(false);
         } else if (isMounted) {

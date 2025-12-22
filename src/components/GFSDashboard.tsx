@@ -2,58 +2,101 @@
 
 import { useState, useEffect } from "react";
 import { Cloud, Wind, ThermometerSun, Play, Pause, ChevronLeft, ChevronRight, Map as MapIcon, Layers, Download } from "lucide-react";
-import SynopticMap, { prefetchMap } from "./SynopticMap";
+import SynopticMap from "./SynopticMap";
 
 export default function GFSDashboard() {
   const [mapType, setMapType] = useState("t2m");
   const [region, setRegion] = useState("eastern_med");
   const [forecastHour, setForecastHour] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
-  const [cachingProgress, setCachingProgress] = useState<{current: number, total: number} | null>(null);
+  const [availableMaps, setAvailableMaps] = useState<Record<string, Record<string, number[]>>>({});
+  const [runDate, setRunDate] = useState("");
+  const [runHour, setRunHour] = useState("12");
+  const [availableHours, setAvailableHours] = useState<number[]>([]);
+
+  useEffect(() => {
+    const fetchAvailableMaps = async () => {
+      try {
+        const apiUrl = process.env.NEXT_PUBLIC_MAPS_API_URL || "http://localhost:3000/api/v1";
+        const res = await fetch(`${apiUrl}/maps?parameter=${mapType}`);
+        if (res.ok) {
+          const data = await res.json();
+          setAvailableMaps(data);
+          
+          // Set default run date and hour if not set or not available
+          const dates = Object.keys(data).sort();
+          if (dates.length > 0) {
+            let selectedDate = runDate;
+            if (!data[selectedDate]) {
+              selectedDate = dates[dates.length - 1]; // Latest date
+              setRunDate(selectedDate);
+            }
+            
+            const runs = Object.keys(data[selectedDate]).sort();
+            if (!data[selectedDate][runHour]) {
+              setRunHour(runs[runs.length - 1]); // Latest run for that date
+            }
+          } else {
+            // No maps available for this parameter
+            setAvailableMaps({});
+          }
+        }
+      } catch (e) {
+        console.error("Failed to fetch available maps", e);
+      }
+    };
+    
+    fetchAvailableMaps();
+    const interval = setInterval(fetchAvailableMaps, 60000);
+    return () => clearInterval(interval);
+  }, [runDate, runHour, mapType]);
+
+  useEffect(() => {
+    if (availableMaps[runDate] && availableMaps[runDate][runHour]) {
+      setAvailableHours(availableMaps[runDate][runHour]);
+      // If current forecast hour is not available, snap to nearest or first
+      if (!availableMaps[runDate][runHour].includes(forecastHour)) {
+        setForecastHour(availableMaps[runDate][runHour][0] || 0);
+      }
+    } else {
+      setAvailableHours([]);
+    }
+  }, [availableMaps, runDate, runHour]);
 
   // Animation loop
   useEffect(() => {
     let interval: NodeJS.Timeout;
-    if (isPlaying) {
+    if (isPlaying && availableHours.length > 0) {
       interval = setInterval(() => {
         setForecastHour((prev) => {
-          const next = prev + 3; // GFS step is usually 3 hours
-          return next > 120 ? 0 : next; // Loop back after 120h (5 days)
+          const currentIndex = availableHours.indexOf(prev);
+          const nextIndex = currentIndex + 1;
+          if (nextIndex >= availableHours.length) {
+            return availableHours[0];
+          }
+          return availableHours[nextIndex];
         });
       }, 1000); // 1 second per frame
     }
     return () => clearInterval(interval);
-  }, [isPlaying]);
+  }, [isPlaying, availableHours]);
 
   const togglePlay = () => setIsPlaying(!isPlaying);
   
   const stepForward = () => {
-    setForecastHour(prev => Math.min(prev + 3, 384));
+    if (availableHours.length === 0) return;
+    const currentIndex = availableHours.indexOf(forecastHour);
+    const nextIndex = Math.min(currentIndex + 1, availableHours.length - 1);
+    setForecastHour(availableHours[nextIndex]);
     setIsPlaying(false);
   };
 
   const stepBackward = () => {
-    setForecastHour(prev => Math.max(prev - 3, 0));
+    if (availableHours.length === 0) return;
+    const currentIndex = availableHours.indexOf(forecastHour);
+    const prevIndex = Math.max(currentIndex - 1, 0);
+    setForecastHour(availableHours[prevIndex]);
     setIsPlaying(false);
-  };
-
-  const handleCacheRun = async () => {
-    const maxHour = 384; // Cache full run (16 days)
-    const step = 3;
-    const hours = [];
-    for (let h = 0; h <= maxHour; h += step) hours.push(h);
-    
-    setCachingProgress({ current: 0, total: hours.length });
-    setIsPlaying(false);
-
-    const apiUrl = process.env.NEXT_PUBLIC_MAPS_API_URL || "http://localhost:3000/api/v1";
-
-    for (let i = 0; i < hours.length; i++) {
-      await prefetchMap(apiUrl, "gfs", "20251221", "12", mapType, hours[i]);
-      setCachingProgress({ current: i + 1, total: hours.length });
-    }
-    
-    setCachingProgress(null);
   };
 
   return (
@@ -61,7 +104,27 @@ export default function GFSDashboard() {
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800 gap-4">
         <div>
           <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-50">GFS Model Viewer</h1>
-          <p className="text-sm text-slate-500">Run: Latest (0.25°)</p>
+          <div className="flex items-center gap-2 mt-1">
+            <p className="text-sm text-slate-500">Run:</p>
+            <select 
+              value={runDate}
+              onChange={(e) => setRunDate(e.target.value)}
+              className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded px-2 py-1 text-xs"
+            >
+              {Object.keys(availableMaps).sort().map(date => (
+                <option key={date} value={date}>{date}</option>
+              ))}
+            </select>
+            <select 
+              value={runHour}
+              onChange={(e) => setRunHour(e.target.value)}
+              className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded px-2 py-1 text-xs"
+            >
+              {availableMaps[runDate] && Object.keys(availableMaps[runDate]).sort().map(run => (
+                <option key={run} value={run}>{run}Z</option>
+              ))}
+            </select>
+          </div>
         </div>
         <div className="flex gap-2 w-full sm:w-auto">
            <select 
@@ -97,8 +160,8 @@ export default function GFSDashboard() {
       <SynopticMap 
         parameter={mapType}
         model="gfs"
-        runDate="20251221"
-        runHour="12"
+        runDate={runDate}
+        runHour={runHour}
         forecastHour={forecastHour}
       />
 
@@ -108,39 +171,20 @@ export default function GFSDashboard() {
            <div className="flex items-center gap-2">
              <button 
                onClick={togglePlay}
-               className="p-2 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 hover:bg-blue-200 dark:hover:bg-blue-900/50 transition-colors"
+               disabled={availableHours.length === 0}
+               className="p-2 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 hover:bg-blue-200 dark:hover:bg-blue-900/50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
              >
                {isPlaying ? <Pause className="h-5 w-5" /> : <Play className="h-5 w-5" />}
              </button>
              <div className="flex gap-1">
-               <button onClick={stepBackward} className="p-1 text-slate-500 hover:text-slate-900 dark:hover:text-slate-300">
+               <button onClick={stepBackward} disabled={availableHours.length === 0} className="p-1 text-slate-500 hover:text-slate-900 dark:hover:text-slate-300 disabled:opacity-50">
                  <ChevronLeft className="h-6 w-6" />
                </button>
-               <button onClick={stepForward} className="p-1 text-slate-500 hover:text-slate-900 dark:hover:text-slate-300">
+               <button onClick={stepForward} disabled={availableHours.length === 0} className="p-1 text-slate-500 hover:text-slate-900 dark:hover:text-slate-300 disabled:opacity-50">
                  <ChevronRight className="h-6 w-6" />
                </button>
              </div>
              <div className="h-6 w-px bg-slate-200 dark:bg-slate-700 mx-2"></div>
-             <div className="relative">
-               <button 
-                 onClick={handleCacheRun}
-                 disabled={!!cachingProgress}
-                 className="relative overflow-hidden flex items-center gap-2 px-3 py-1.5 text-xs font-medium rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 disabled:cursor-not-allowed transition-colors"
-               >
-                 {cachingProgress && (
-                   <div 
-                     className="absolute inset-0 bg-blue-200 dark:bg-blue-900/60 transition-all duration-300 ease-out"
-                     style={{ width: `${(cachingProgress.current / cachingProgress.total) * 100}%` }}
-                   />
-                 )}
-                 <div className="relative flex items-center gap-2 z-10">
-                   <Download className={`h-3.5 w-3.5 ${cachingProgress ? 'animate-bounce' : ''}`} />
-                   {cachingProgress 
-                     ? `Caching ${Math.round((cachingProgress.current / cachingProgress.total) * 100)}%` 
-                     : "Cache Full Run (16 Days)"}
-                 </div>
-               </button>
-             </div>
            </div>
            <div className="text-right">
              <span className="text-2xl font-mono font-bold text-slate-900 dark:text-slate-50">+{forecastHour}h</span>
@@ -151,14 +195,18 @@ export default function GFSDashboard() {
         <input 
           type="range" 
           min="0" 
-          max="384" 
-          step="6" 
-          value={forecastHour}
+          max={availableHours.length > 0 ? availableHours.length - 1 : 0}
+          step="1" 
+          value={availableHours.indexOf(forecastHour) !== -1 ? availableHours.indexOf(forecastHour) : 0}
           onChange={(e) => {
-            setForecastHour(parseInt(e.target.value));
+            const index = parseInt(e.target.value);
+            if (availableHours[index] !== undefined) {
+              setForecastHour(availableHours[index]);
+            }
             setIsPlaying(false);
           }}
-          className="w-full h-2 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-blue-600"
+          disabled={availableHours.length === 0}
+          className="w-full h-2 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-blue-600 disabled:opacity-50"
         />
         <div className="flex justify-between text-xs text-slate-500 mt-2">
           <span>Analysis</span>
