@@ -5,7 +5,7 @@ import { Cloud, Wind, ThermometerSun, Play, Pause, ChevronLeft, ChevronRight, Ma
 import SynopticMap, { prefetchMap } from "./SynopticMap";
 
 export default function GFSDashboard() {
-  const [mapType, setMapType] = useState("synoptic");
+  const [mapType, setMapType] = useState("t2m");
   const [region, setRegion] = useState("eastern_med");
   const [forecastHour, setForecastHour] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -17,7 +17,7 @@ export default function GFSDashboard() {
     if (isPlaying) {
       interval = setInterval(() => {
         setForecastHour((prev) => {
-          const next = prev + 6;
+          const next = prev + 3; // GFS step is usually 3 hours
           return next > 120 ? 0 : next; // Loop back after 120h (5 days)
         });
       }, 1000); // 1 second per frame
@@ -28,26 +28,28 @@ export default function GFSDashboard() {
   const togglePlay = () => setIsPlaying(!isPlaying);
   
   const stepForward = () => {
-    setForecastHour(prev => Math.min(prev + 6, 384));
+    setForecastHour(prev => Math.min(prev + 3, 384));
     setIsPlaying(false);
   };
 
   const stepBackward = () => {
-    setForecastHour(prev => Math.max(prev - 6, 0));
+    setForecastHour(prev => Math.max(prev - 3, 0));
     setIsPlaying(false);
   };
 
   const handleCacheRun = async () => {
     const maxHour = 384; // Cache full run (16 days)
-    const step = 6;
+    const step = 3;
     const hours = [];
     for (let h = 0; h <= maxHour; h += step) hours.push(h);
     
     setCachingProgress({ current: 0, total: hours.length });
     setIsPlaying(false);
 
+    const apiUrl = process.env.NEXT_PUBLIC_MAPS_API_URL || "http://localhost:3000/api/v1";
+
     for (let i = 0; i < hours.length; i++) {
-      await prefetchMap("http://localhost:8000", mapType, region, hours[i]);
+      await prefetchMap(apiUrl, "gfs", "20251221", "12", mapType, hours[i]);
       setCachingProgress({ current: i + 1, total: hours.length });
     }
     
@@ -78,35 +80,25 @@ export default function GFSDashboard() {
       {/* Parameter/Map Type Selection */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         <ParameterCard 
-          icon={<Layers className="h-5 w-5" />} 
-          label="Synoptic (Combined)" 
-          active={mapType === "synoptic"} 
-          onClick={() => setMapType("synoptic")}
-        />
-        <ParameterCard 
           icon={<ThermometerSun className="h-5 w-5" />} 
-          label="500mb Height" 
-          active={mapType === "hgt500"} 
-          onClick={() => setMapType("hgt500")}
-        />
-        <ParameterCard 
-          icon={<Wind className="h-5 w-5" />} 
-          label="MSLP (Isobars)" 
-          active={mapType === "mslp"} 
-          onClick={() => setMapType("mslp")}
+          label="Temperature (2m)" 
+          active={mapType === "t2m"} 
+          onClick={() => setMapType("t2m")}
         />
         <ParameterCard 
           icon={<Cloud className="h-5 w-5" />} 
-          label="Cloud Cover (Coming Soon)" 
-          active={false}
-          onClick={() => {}}
+          label="Precipitation" 
+          active={mapType === "apcp"} 
+          onClick={() => setMapType("apcp")}
         />
       </div>
 
       {/* Map Display */}
       <SynopticMap 
-        mapType={mapType}
-        region={region}
+        parameter={mapType}
+        model="gfs"
+        runDate="20251221"
+        runHour="12"
         forecastHour={forecastHour}
       />
 

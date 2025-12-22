@@ -4,39 +4,47 @@ import { useState, useEffect } from "react";
 
 interface SynopticMapProps {
   apiUrl?: string;
-  mapType?: string;
-  region?: string;
+  model?: string;
+  runDate?: string;
+  runHour?: string;
+  parameter?: string;
   forecastHour?: number;
 }
 
-// Cache to store downloaded map images
+// Cache to store signed URLs
 export const mapCache = new Map<string, string>();
 
 export const prefetchMap = async (
   apiUrl: string,
-  mapType: string,
-  region: string,
+  model: string,
+  runDate: string,
+  runHour: string,
+  parameter: string,
   forecastHour: number
 ) => {
-  const cacheKey = `${mapType}-${region}-${forecastHour}`;
+  const fHourStr = forecastHour.toString().padStart(3, '0');
+  const cacheKey = `${model}-${runDate}-${runHour}-${parameter}-${fHourStr}`;
   if (mapCache.has(cacheKey)) return;
 
-  const url = `${apiUrl}/api/v1/maps/${mapType}/${region}/latest/image?forecast_hour=${forecastHour}`;
+  const url = `${apiUrl}/maps/${model}/${runDate}/${runHour}/${parameter}/${fHourStr}`;
   try {
     const res = await fetch(url);
     if (!res.ok) throw new Error("Failed to fetch");
-    const blob = await res.blob();
-    const objectUrl = URL.createObjectURL(blob);
-    mapCache.set(cacheKey, objectUrl);
+    const data = await res.json();
+    if (data.url) {
+        mapCache.set(cacheKey, data.url);
+    }
   } catch (err) {
     console.error(`Failed to prefetch map for hour ${forecastHour}`, err);
   }
 };
 
 export default function SynopticMap({ 
-  apiUrl = "http://localhost:8000",
-  mapType = "synoptic",
-  region = "eastern_med",
+  apiUrl = process.env.NEXT_PUBLIC_MAPS_API_URL || "http://localhost:3000/api/v1",
+  model = "gfs",
+  runDate = "20251221", // Default for dev
+  runHour = "12",
+  parameter = "t2m",
   forecastHour = 0
 }: SynopticMapProps) {
   const [imageUrl, setImageUrl] = useState<string | null>(null);
@@ -45,7 +53,8 @@ export default function SynopticMap({
 
   useEffect(() => {
     let isMounted = true;
-    const cacheKey = `${mapType}-${region}-${forecastHour}`;
+    const fHourStr = forecastHour.toString().padStart(3, '0');
+    const cacheKey = `${model}-${runDate}-${runHour}-${parameter}-${fHourStr}`;
 
     // Check if image is already in cache
     if (mapCache.has(cacheKey)) {
@@ -58,18 +67,18 @@ export default function SynopticMap({
     setLoading(true);
     setError(null);
 
-    // Construct the image URL without timestamp to allow browser caching as well
-    const url = `${apiUrl}/api/v1/maps/${mapType}/${region}/latest/image?forecast_hour=${forecastHour}`;
+    const url = `${apiUrl}/maps/${model}/${runDate}/${runHour}/${parameter}/${fHourStr}`;
     
     fetch(url)
       .then(async (res) => {
-        if (!res.ok) throw new Error("Failed to fetch image");
-        const blob = await res.blob();
-        if (isMounted) {
-          const objectUrl = URL.createObjectURL(blob);
-          mapCache.set(cacheKey, objectUrl);
-          setImageUrl(objectUrl);
+        if (!res.ok) throw new Error("Failed to fetch image info");
+        const data = await res.json();
+        if (isMounted && data.url) {
+          mapCache.set(cacheKey, data.url);
+          setImageUrl(data.url);
           setLoading(false);
+        } else if (isMounted) {
+            throw new Error("No URL in response");
         }
       })
       .catch((err) => {
@@ -83,7 +92,7 @@ export default function SynopticMap({
     return () => {
       isMounted = false;
     };
-  }, [apiUrl, mapType, region, forecastHour]);
+  }, [apiUrl, model, runDate, runHour, parameter, forecastHour]);
 
   if (error) {
     return (
