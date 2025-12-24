@@ -150,7 +150,7 @@ export default function GFSDashboard() {
         />
         <ParameterCard 
           icon={<Cloud className="h-5 w-5" />} 
-          label="Precipitation" 
+          label="Accumulated Precip" 
           active={mapType === "apcp"} 
           onClick={() => setMapType("apcp")}
         />
