@@ -26,6 +26,8 @@ export default function SynopticMap({
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (!runDate || !runHour) return;
+
     let isMounted = true;
     const fHourStr = forecastHour.toString().padStart(3, '0');
 
