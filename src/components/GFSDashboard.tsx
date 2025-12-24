@@ -216,10 +216,10 @@ export default function GFSDashboard() {
           className="w-full h-2 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-blue-600 disabled:opacity-50"
         />
         <div className="flex justify-between text-xs text-slate-500 mt-2">
-          <span>Analysis</span>
-          <span>+120h (5 Days)</span>
-          <span>+240h (10 Days)</span>
-          <span>+384h (16 Days)</span>
+          <span>{availableHours.length > 0 ? `+${availableHours[0]}h` : 'Analysis'}</span>
+          <span>{availableHours.length > 0 ? `+${availableHours[Math.floor(availableHours.length / 3)]}h` : ''}</span>
+          <span>{availableHours.length > 0 ? `+${availableHours[Math.floor(2 * availableHours.length / 3)]}h` : ''}</span>
+          <span>{availableHours.length > 0 ? `+${availableHours[availableHours.length - 1]}h` : ''}</span>
         </div>
       </div>
     </div>

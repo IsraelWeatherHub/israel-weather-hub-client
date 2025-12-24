@@ -38,10 +38,28 @@ export default function SynopticMap({
       .then(async (res) => {
         if (!res.ok) throw new Error("Failed to fetch image info");
         const data = await res.json();
-        if (isMounted && data.url) {
-          setImageUrl(data.url);
-          setLoading(false);
-        } else if (isMounted) {
+        
+        if (!isMounted) return;
+
+        if (data.url) {
+          // Preload the image to prevent blinking
+          const img = new Image();
+          img.src = data.url;
+          
+          img.onload = () => {
+            if (isMounted) {
+              setImageUrl(data.url);
+              setLoading(false);
+            }
+          };
+          
+          img.onerror = () => {
+            if (isMounted) {
+              setError("Failed to load image resource");
+              setLoading(false);
+            }
+          };
+        } else {
             throw new Error("No URL in response");
         }
       })
@@ -60,16 +78,16 @@ export default function SynopticMap({
 
   if (error) {
     return (
-      <div className="w-full h-[600px] bg-slate-100 dark:bg-slate-800 rounded-xl flex items-center justify-center text-red-500">
+      <div className="w-full h-[500px] bg-slate-100 dark:bg-slate-800 rounded-xl flex items-center justify-center text-red-500">
         {error}
       </div>
     );
   }
 
   return (
-    <div className="w-full rounded-xl overflow-hidden border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 relative min-h-[400px]">
+    <div className="w-full h-[500px] rounded-xl overflow-hidden border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 relative flex items-center justify-center">
       {loading && (
-        <div className="absolute inset-0 z-10 bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
+        <div className={`absolute inset-0 z-10 flex items-center justify-center ${!imageUrl ? 'bg-slate-100 dark:bg-slate-800' : 'bg-transparent'}`}>
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
         </div>
       )}
@@ -77,7 +95,7 @@ export default function SynopticMap({
         <img 
           src={imageUrl} 
           alt="Synoptic Weather Map" 
-          className="w-full h-auto object-contain"
+          className="w-full h-full object-contain"
         />
       )}
     </div>
