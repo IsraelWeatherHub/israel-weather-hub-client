@@ -9,6 +9,7 @@ interface SynopticMapProps {
   runHour?: string;
   parameter?: string;
   forecastHour?: number;
+  region?: string;
 }
 
 export default function SynopticMap({ 
@@ -17,7 +18,8 @@ export default function SynopticMap({
   runDate = "20251221", // Default for dev
   runHour = "12",
   parameter = "t2m",
-  forecastHour = 0
+  forecastHour = 0,
+  region = "israel"
 }: SynopticMapProps) {
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -30,7 +32,7 @@ export default function SynopticMap({
     setLoading(true);
     setError(null);
 
-    const url = `${apiUrl}/maps/${model}/${runDate}/${runHour}/${parameter}/${fHourStr}`;
+    const url = `${apiUrl}/maps/${model}/${runDate}/${runHour}/${parameter}/${fHourStr}/${region}`;
     
     fetch(url)
       .then(async (res) => {
@@ -54,7 +56,7 @@ export default function SynopticMap({
     return () => {
       isMounted = false;
     };
-  }, [apiUrl, model, runDate, runHour, parameter, forecastHour]);
+  }, [apiUrl, model, runDate, runHour, parameter, forecastHour, region]);
 
   if (error) {
     return (

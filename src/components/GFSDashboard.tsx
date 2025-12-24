@@ -18,7 +18,7 @@ export default function GFSDashboard() {
     const fetchAvailableMaps = async () => {
       try {
         const apiUrl = process.env.NEXT_PUBLIC_MAPS_API_URL || "http://localhost:3000/api/v1";
-        const res = await fetch(`${apiUrl}/maps?parameter=${mapType}`);
+        const res = await fetch(`${apiUrl}/maps?parameter=${mapType}&region=${region}`);
         if (res.ok) {
           const data = await res.json();
           setAvailableMaps(data);
@@ -49,7 +49,7 @@ export default function GFSDashboard() {
     fetchAvailableMaps();
     const interval = setInterval(fetchAvailableMaps, 60000);
     return () => clearInterval(interval);
-  }, [runDate, runHour, mapType]);
+  }, [runDate, runHour, mapType, region]);
 
   useEffect(() => {
     if (availableMaps[runDate] && availableMaps[runDate][runHour]) {
@@ -163,6 +163,7 @@ export default function GFSDashboard() {
         runDate={runDate}
         runHour={runHour}
         forecastHour={forecastHour}
+        region={region}
       />
 
       {/* Time Control */}
