@@ -154,6 +154,12 @@ export default function GFSDashboard() {
           active={mapType === "apcp"} 
           onClick={() => setMapType("apcp")}
         />
+        <ParameterCard 
+          icon={<Layers className="h-5 w-5" />} 
+          label="Synoptic (500hPa)" 
+          active={mapType === "synoptic"} 
+          onClick={() => setMapType("synoptic")}
+        />
       </div>
 
       {/* Map Display */}
