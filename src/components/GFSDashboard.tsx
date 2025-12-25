@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { Cloud, Wind, ThermometerSun, Play, Pause, ChevronLeft, ChevronRight, Map as MapIcon, Layers, Download } from "lucide-react";
 import SynopticMap from "./SynopticMap";
 
-export default function GFSDashboard() {
+export default function GFSDashboard({ model }: { model: string }) {
   const [mapType, setMapType] = useState("t2m");
   const [region, setRegion] = useState("eastern_med");
   const [forecastHour, setForecastHour] = useState(0);
@@ -18,7 +18,7 @@ export default function GFSDashboard() {
     const fetchAvailableMaps = async () => {
       try {
         const apiUrl = process.env.NEXT_PUBLIC_MAPS_API_URL || "http://localhost:3000/api/v1";
-        const res = await fetch(`${apiUrl}/maps?parameter=${mapType}&region=${region}`);
+        const res = await fetch(`${apiUrl}/maps?parameter=${mapType}&region=${region}&model=${model}`);
         if (res.ok) {
           const data = await res.json();
           setAvailableMaps(data);
@@ -49,7 +49,7 @@ export default function GFSDashboard() {
     fetchAvailableMaps();
     const interval = setInterval(fetchAvailableMaps, 60000);
     return () => clearInterval(interval);
-  }, [runDate, runHour, mapType, region]);
+  }, [runDate, runHour, mapType, region, model]);
 
   useEffect(() => {
     if (availableMaps[runDate] && availableMaps[runDate][runHour]) {
@@ -103,7 +103,7 @@ export default function GFSDashboard() {
     <div className="flex-1 space-y-6">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800 gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-50">GFS Model Viewer</h1>
+          <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-50">{model.toUpperCase()} Model Viewer</h1>
           <div className="flex items-center gap-2 mt-1">
             <p className="text-sm text-slate-500">Run:</p>
             <select 
@@ -165,7 +165,7 @@ export default function GFSDashboard() {
       {/* Map Display */}
       <SynopticMap 
         parameter={mapType}
-        model="gfs"
+        model={model}
         runDate={runDate}
         runHour={runHour}
         forecastHour={forecastHour}
